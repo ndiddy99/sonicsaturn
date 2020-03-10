@@ -1,0 +1,5 @@
+# depslib dependency file v1.0
+1583642211 source:c:\users\nathan\documents\sonic2saturn\main.c
+	<stdio.h>
+	<stdint.h>
+
