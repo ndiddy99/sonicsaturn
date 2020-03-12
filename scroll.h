@@ -5,8 +5,8 @@
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 224
 //maximum # tiles i'll show onscreen
-#define SCREEN_TILES_X 28
-#define SCREEN_TILES_Y 20
+#define SCREEN_TILES_X (20)
+#define SCREEN_TILES_Y (14)
 #define BG_TILES 32
 
 extern Sint32 map_tiles_x[], map_tiles_y[];
@@ -31,7 +31,7 @@ extern Fixed32 scrolls_y[];
 
 void scroll_init();
 //load block into scroll #num
-void scroll_load_block(int num, int block, int x, int y, int mirror);
+void scroll_load_block(int num, int block, int x, int y);
 void scroll_load_chunk(int num, int chunk, int x, int y);
 //translate scroll by x,y amounts
 void scroll_move(int num, Fixed32 x, Fixed32 y);
@@ -40,7 +40,7 @@ void scroll_set(int num, Fixed32 x, Fixed32 y);
 //sets the scale of a bg
 void scroll_scale(int num, Fixed32 scale);
 //gets the value at the given coordinates for a square map
-Uint16 scroll_get(int map, int x, int y);
+Uint16 scroll_get(int num, int x, int y);
 //copies scroll to VRAM after position has been changed by move/set scroll
 void scroll_copy(int num);
 //sets up a linescroll screen with 4 splits.

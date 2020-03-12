@@ -43,8 +43,9 @@ void SetVblank(void) {
 
 void UsrVblankIn(void) {
 	m68k_com->start = 1;
-	scroll_copy(SCROLL_PLAYFIELD);
-	// scroll_copy(1);
+	// scroll_copy(SCROLL_PLAYFIELD);
+	scroll_copy(0);
+	scroll_copy(1);
 	
 	SCL_VblankStart();
 }

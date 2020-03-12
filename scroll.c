@@ -18,7 +18,7 @@ Uint32 copy_modes[]  = {0, 0};
 Uint16 *maps[2]; //map locations in WRAM for the scrolling backgrounds
 int scroll_xsize = 0;
 int scroll_ysize = 0;
-Uint32 vram[] = {SCL_VDP2_VRAM_A0, SCL_VDP2_VRAM_A0 + 0x800, SCL_VDP2_VRAM_B1, SCL_VDP2_VRAM_B1 + 0x800}; //where in VRAM each tilemap is
+Uint32 vram[] = {SCL_VDP2_VRAM_A0, SCL_VDP2_VRAM_A0 + 0x4000, SCL_VDP2_VRAM_B1, SCL_VDP2_VRAM_B1 + 0x4000}; //where in VRAM each tilemap is
 #define VRAM_PTR(bg) ((Uint32 *)vram[bg])
 //block offset for 8x8 tiles in A1
 #define VRAM_A1_OFFSET (0x1000)
@@ -68,6 +68,7 @@ SclLineparam line_param1;
 
 Uint32 block_defs[0x300 * 4];
 Uint16 chunk_defs[0x100 * 64];
+Uint8 level[0x1000];
 
 void scroll_init() {
 	int i;
@@ -80,8 +81,9 @@ void scroll_init() {
 	SCL_SetColRamMode(SCL_CRM24_1024);
 		SCL_AllocColRam(SCL_NBG0, 64, OFF);
 		SCL_SetColRam(SCL_NBG0, 0, 64, (void *)(cpz_pal));
-
-		BackCol = 0x0000; //set the background color to black
+		SCL_AllocColRam(SCL_NBG1, 64, OFF);
+		SCL_SetColRam(SCL_NBG1, 0, 64, (void *)(cpz_pal));
+		BackCol = 0x0004; //set the background color
 	SCL_SetBack(SCL_VDP2_VRAM+0x80000-2,1,&BackCol);
 
 	//---nbg0---
@@ -90,28 +92,32 @@ void scroll_init() {
 	memcpy(VramWorkP, (void *)LWRAM, 32 * 867);
 	cd_load_nosize("CPZ16.BIN", block_defs);
 	cd_load_nosize("CPZ128.BIN", chunk_defs);
+	cd_load_nosize("CPZ.LVL", level);
 	// cd_load(level->bg_far.map_name, (void *)LWRAM, level->bg_far.map_width * level->bg_far.map_height * 2);
 	tilemap_ptr = VRAM_PTR(0);
 	for (i = 0; i < 64 * 64; i++) {
-		tilemap_ptr[i] = 0;
+		tilemap_ptr[i] = VRAM_A1_OFFSET;
 	}
-
+	tilemap_ptr = VRAM_PTR(1);
+	for (i = 0; i < 64 * 64; i++) {
+		tilemap_ptr[i] = VRAM_A1_OFFSET;
+	}
 	print_num(block_defs[0xA * 4] | VRAM_A1_OFFSET, 5, 0);
 	print_num((1 << 16) | 0x1012, 6, 0);
 
-	// tilemap_ptr[0] =  block_defs[0xA * 4] | VRAM_A1_OFFSET;
-	// tilemap_ptr[1] =  block_defs[0xA * 4 + 1] | VRAM_A1_OFFSET;
-	// tilemap_ptr[64] = block_defs[0xA * 4 + 2] | VRAM_A1_OFFSET;
-	// tilemap_ptr[65] = block_defs[0xA * 4 + 3] | VRAM_A1_OFFSET;
-	// scroll_load_block(0, 0xa, 0, 0);
-	// scroll_load_block(0, 0x114, 1, 0);
-	// scroll_load_block(0, 0x23e, 2, 0);
-	// scroll_load_block(0, 0x22b, 3, 0);
 
-	scroll_load_chunk(0, 1, 0, 0);
-	scroll_load_chunk(0, 2, 1, 0);
-	scroll_load_chunk(0, 4, 0, 1);
-	scroll_load_chunk(0, 5, 1, 1);
+	//load initial level segment
+	for (i = 0; i < 4; i++) {
+		scroll_load_chunk(1, level[0x80 + i], i, 0);
+		scroll_load_chunk(1, level[0x180 + i], i, 1);
+		scroll_load_chunk(1, level[0x280 + i], i, 2);
+	}
+
+	for (i = 0; i < 4; i++) {
+		scroll_load_chunk(0, level[0x100 + i], i, 0);
+		scroll_load_chunk(0, level[0x200 + i], i, 1);
+		scroll_load_chunk(0, level[0x300 + i], i, 2);
+	}
 
 	// memcpy(TilemapVram, (void *)LWRAM, level->bg_far.map_width * level->bg_far.map_height * 2);
 	// memcpy(TilemapVram, (void *)LWRAM, 0x800);
@@ -141,8 +147,7 @@ void scroll_init() {
 	SCL_SetConfig(SCL_NBG0, &scfg0);
 
 	memcpy((void *)&scfg1, (void *)&scfg0, sizeof(SclConfig));
-	scfg1.patnamecontrl = 0x0004;
-	scfg1.dispenbl = OFF;
+	scfg1.dispenbl = ON;
 	for(i=0;i<4;i++)   scfg1.plate_addr[i] = vram[1];
 	SCL_SetConfig(SCL_NBG1, &scfg1);
 
@@ -181,12 +186,12 @@ void scroll_init() {
 	SCL_Close();
 	scroll_scale(0, FIXED(1));
 	scroll_scale(1, FIXED(1));
-	SCL_SetPriority(SCL_NBG3, 7); //set layer priorities
+	SCL_SetPriority(SCL_NBG0, 7); //set layer priorities
 	SCL_SetPriority(SCL_SPR,  6);
 	SCL_SetPriority(SCL_SP1,  6);
-	SCL_SetPriority(SCL_NBG2, 6);
-	SCL_SetPriority(SCL_NBG1, 5);
-	SCL_SetPriority(SCL_NBG0, 4);
+	SCL_SetPriority(SCL_NBG1, 6);
+	SCL_SetPriority(SCL_NBG2, 5);
+	SCL_SetPriority(SCL_NBG3, 4);
 	
 	// curr_level = level;
 
@@ -201,10 +206,17 @@ void scroll_init() {
 #define TILE_XFLIP (1 << 30)
 #define TILE_YFLIP (1 << 31)
 
-void scroll_load_block(int num, int block, int x, int y, int mirror) {
+void scroll_load_block(int num, int block, int x, int y) {
 	Uint32 *tilemap_ptr = VRAM_PTR(num);
 	x <<= 1;
 	y <<= 1;
+	int mirror = (block & 0xc00) >> 10;
+	block &= 0x3ff; //isolate the tile index
+
+	if (x < 0 || y < 0) {
+		return;
+	}
+
 	switch (mirror) {
 	case BLOCK_MIRROR_NONE:
 		tilemap_ptr[y * 64 + x]           = block_defs[block << 2] | VRAM_A1_OFFSET;
@@ -246,58 +258,40 @@ void scroll_load_chunk(int num, int chunk, int x, int y) {
 	for (i = 0; i < 8; i++) {
 		for (j = 0; j < 8; j++) {
 			block = chunk_defs[chunk * 64 + count++];
-			scroll_load_block(num, block & 0x3ff, j + (x * 8), i + (y * 9), (block & 0xc00) >> 10);
+			scroll_load_block(num, block & 0xfff, j + (x * 8), i + (y * 8));
 		}
 	}
 }
 
+
 void scroll_move(int num, Fixed32 x, Fixed32 y) {
 	Sint32 curr_tile_x;
+	Sint32 curr_tile_y;
+
 	scrolls_x[num] += x;
-	//playfield and foreground use flip-style scrolling, so don't change
-	//y position here for them
-	if (num > 2) {
-		scrolls_y[num] += y;
+	scrolls_y[num] += y;
+	curr_tile_x = MTH_FixedToInt(scrolls_x[num]) >> 4; //tile size is 16x16
+	curr_tile_y = MTH_FixedToInt(scrolls_y[num]) >> 4;
+	if (curr_tile_x - map_tiles_x[num] > 0) { //if x value increasing
+		copy_modes[num] |= COPY_MODE_RCOL;
 	}
-	if (num < 2) {
-		curr_tile_x = MTH_FixedToInt(scrolls_x[num]) >> 4; //tile size is 16x16
-		// curr_tile_y = MTH_FixedToInt(scrolls_y[num]) >> 4;
-		// copy_modes[num] = 0;
-		if (curr_tile_x - map_tiles_x[num] > 0) { //if x value increasing
-			copy_modes[num] |= COPY_MODE_RCOL;
-		}
-		else if (curr_tile_x - map_tiles_x[num] < 0) { //if x value decreasing
-			copy_modes[num] |= COPY_MODE_LCOL;
-		}
-		// if (curr_tile_y - map_tiles_y[num] > 0) { //if y value increasing
-		// 	copy_modes[num] |= COPY_MODE_BROW;
-		// }
-		// else if (curr_tile_y - map_tiles_y[num] < 0) { //if y value decreasing
-		// 	copy_modes[num] |= COPY_MODE_TROW;
-		// }
-		map_tiles_x[num] = curr_tile_x;
-		// map_tiles_y[num] = curr_tile_y;
+	else if (curr_tile_x - map_tiles_x[num] < 0) { //if x value decreasing
+		copy_modes[num] |= COPY_MODE_LCOL;
 	}
-	switch (num) {
-		case SCROLL_PLAYFIELD:
-			SCL_Open(SCL_NBG2);
-			break;
-		case SCROLL_FOREGROUND:
-			SCL_Open(SCL_NBG3);
-			break;
-		case SCROLL_BACKGROUND1:
-			SCL_Open(SCL_NBG0);
-			break;
-		case SCROLL_BACKGROUND2:
-			SCL_Open(SCL_NBG1);
-			break;
+	if (curr_tile_y - map_tiles_y[num] > 0) { //if y value increasing
+		copy_modes[num] |= COPY_MODE_BROW;
 	}
-		if (num < 2) {
-			SCL_MoveTo(scrolls_x[num], 0, 0);
-		}
-		else {
-			SCL_MoveTo(scrolls_x[num], scrolls_y[num], 0);
-		}
+	else if (curr_tile_y - map_tiles_y[num] < 0) { //if y value decreasing
+		copy_modes[num] |= COPY_MODE_TROW;
+	}
+	map_tiles_x[num] = curr_tile_x;
+	map_tiles_y[num] = curr_tile_y;
+	//Scroll bitmasks are:
+	//NBG0 - (1 << 2)
+	//NBG1 - (1 << 3)
+	//etc
+	SCL_Open(1 << (num + 2));
+		SCL_MoveTo(scrolls_x[num], scrolls_y[num], 0);
 	SCL_Close();
 }
 
@@ -333,56 +327,63 @@ void scroll_scale(int num, Fixed32 scale) {
 }
 
 //gets the value at the given coordinates for a map
-Uint16 scroll_get(int map, int x, int y) {
-	Uint16 *map_ptr = maps[map];
-	if (map_ptr == NULL || x >= scroll_xsize || y >= scroll_ysize || y < 0) {
+Uint16 scroll_get(int num, int x, int y) {
+	Uint8 chunk;
+
+	if (x < 0 || y < 0 || x > 2048 || y > 256) {
 		return 0;
 	}
-
-	if (x < 0) {
-		return 1;
+	if (num == 0) {
+		//foreground and background stored line-by-line
+		//and interleaved
+		//x >> 7 is same as x / 128 (each chunk is 128x128 pixels)
+		chunk = level[(y / 8) * 0x100 + (x / 8)];
 	}
-
-	return map_ptr[(y * scroll_xsize) + x];
+	else {
+		//background
+		chunk = level[(y / 8) * 0x100 + 0x80 + (x / 8)];
+	}
+	//each chunk is 64 words, an 8x8 grid.
+	//((y & 0x7f) >> 4) = block position within chunk
+	return chunk_defs[(chunk * 64) + ((y % 8) * 8) + (x % 8)];
 }
 
 void scroll_copy(int num) {
-	// int i, pos;
+	int i;
 
-	// Uint16 *vram_ptr = VRAM_PTR(num + 2);
-	// if (copy_modes[num] & COPY_MODE_RCOL) {
-	// 	for (i = 0; i < 16; i++) {
-	// 		pos = (i * 32) + ((map_tiles_x[num] + SCREEN_TILES_X) % 32);
-	// 		if (pos >= 0) {
-	// 			vram_ptr[pos] = scroll_get(num, map_tiles_x[num] + SCREEN_TILES_X, i + map_tiles_y[num]);
-	// 		}
-	// 	}
-	// }
-	// if (copy_modes[num] & COPY_MODE_LCOL) {
-	// 	for (i = 0; i < 16; i++) {
-	// 		pos = (i * 32) + ((map_tiles_x[num] - 1) % 32);
-	// 		if (pos >= 0) {
-	// 			vram_ptr[pos] = scroll_get(num, map_tiles_x[num] - 1, i + map_tiles_y[num]);
-	// 		}
-	// 	}		
-	// }
-	// if (copy_modes[num] & COPY_MODE_BROW) {
-	// 	for (i = -1; i < SCREEN_TILES_X + 1; i++) {
-	// 		pos = (((map_tiles_y[num] + SCREEN_TILES_Y) % 32) * 32) + ((i + map_tiles_x[num]) % 32);
-	// 		if (pos >= 0) {
-	// 			vram_ptr[pos] = scroll_get(num, map_tiles_x[num] + i, map_tiles_y[num] + SCREEN_TILES_Y);
-	// 		}
-	// 	}
-	// }
-	// if (copy_modes[num] & COPY_MODE_TROW) {
-	// 	for (i = -1; i < SCREEN_TILES_X + 1; i++) {
-	// 		pos = (((map_tiles_y[num] - 1) % 32) * 32) + ((i + map_tiles_x[num]) % 32);
-	// 		if (pos >= 0) {
-	// 			vram_ptr[(((map_tiles_y[num] - 1) % 32) * 32) + ((i + map_tiles_x[num]) % 32)] =
-	// 				scroll_get(num, map_tiles_x[num] + i, map_tiles_y[num] - 1);
-	// 		}
-	// 	}
-	// 
+	if (copy_modes[num] & COPY_MODE_RCOL) {
+		for (i = -2; i < SCREEN_TILES_Y + 2; i++) {
+			scroll_load_block(num,
+				scroll_get(num, map_tiles_x[num] + SCREEN_TILES_X, i + map_tiles_y[num]),
+				((map_tiles_x[num] + SCREEN_TILES_X) % 32),
+				(map_tiles_y[num] + i) % 32);
+		}
+	}
+	if (copy_modes[num] & COPY_MODE_LCOL) {
+		for (i = -2; i < SCREEN_TILES_Y + 2; i++) {
+			scroll_load_block(num,
+				scroll_get(num, map_tiles_x[num] - 1, i + map_tiles_y[num]),
+				((map_tiles_x[num] - 1) % 32),
+				(map_tiles_y[num] + i) % 32);
+		}		
+	}
+	if (copy_modes[num] & COPY_MODE_BROW) {
+		for (i = -2; i < SCREEN_TILES_X + 2; i++) {
+			scroll_load_block(num,
+				scroll_get(num, map_tiles_x[num] + i, map_tiles_y[num] + SCREEN_TILES_Y),
+				(map_tiles_x[num] + i) % 32,
+				(map_tiles_y[num] + SCREEN_TILES_Y) % 32);
+		}
+	}
+	if (copy_modes[num] & COPY_MODE_TROW) {
+		for (i = -2; i < SCREEN_TILES_X + 2; i++) {
+			scroll_load_block(num,
+				scroll_get(num, map_tiles_x[num] + i, map_tiles_y[num] - 1),
+				(map_tiles_x[num] + i) % 32,
+				(map_tiles_y[num] - 1) % 32);
+		}
+	}
+	copy_modes[num] = 0;
 }
 
 void scroll_linescroll4(int num, Fixed32 scroll_val, int boundary1, int boundary2, int boundary3) {
