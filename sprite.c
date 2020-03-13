@@ -46,8 +46,13 @@ void sprite_init() {
 	for (i = 0; i < font_num; i++) {
 		SPR_2SetChar(i, COLOR_0, 0, font_width, font_height, (Uint8 *)(image_buf) + (i * font_size));
 	}
-	SCL_AllocColRam(SCL_SPR, 16, OFF);
+	cd_load(sonic_name, image_buf, sonic_size * font_num);
+	for (i = 0; i < sonic_num; i++) {
+		SPR_2SetChar(i + font_num, COLOR_0, 16, sonic_width, sonic_height, (Uint8 *)(image_buf) + (i * sonic_size));
+	}	
+	SCL_AllocColRam(SCL_SPR, 32, OFF);
 	SCL_SetColRam(SCL_SPR, 0, 16, &font_pal);
+	SCL_SetColRam(SCL_SPR, 16, 16, &sonic_pal);
 	sprite_deleteall();
 	SCL_DisplayFrame();
 }
@@ -58,29 +63,29 @@ void sprite_draw(SPRITE_INFO *info) {
 	int i;
 	
 	if (info->scale == MTH_FIXED(1) && info->angle == 0) {
-		xy[0].x = (Sint16)MTH_FixedToInt(info->xPos);
-		xy[0].y = (Sint16)MTH_FixedToInt(info->yPos);
+		xy[0].x = (Sint16)MTH_FixedToInt(info->x);
+		xy[0].y = (Sint16)MTH_FixedToInt(info->y);
 		SPR_2NormSpr(0, info->mirror, 0, 0xffff, info->char_num, xy, NO_GOUR); //4bpp normal sprite
 	}
 	
 	else if (info->angle == 0){
-		xy[0].x = (Sint16)MTH_FixedToInt(info->xPos);
-		xy[0].y = (Sint16)MTH_FixedToInt(info->yPos);
+		xy[0].x = (Sint16)MTH_FixedToInt(info->x);
+		xy[0].y = (Sint16)MTH_FixedToInt(info->y);
 		//the way scale works is by giving the x/y coordinates of the top left and
 		//bottom right corner of the sprite
-		xy[1].x = (Sint16)(MTH_FixedToInt(MTH_Mul(info->xSize, info->scale) + info->xPos));
-		xy[1].y = (Sint16)(MTH_FixedToInt(MTH_Mul(info->ySize, info->scale) + info->yPos));
+		xy[1].x = (Sint16)(MTH_FixedToInt(MTH_Mul(info->x_size, info->scale) + info->x));
+		xy[1].y = (Sint16)(MTH_FixedToInt(MTH_Mul(info->y_size, info->scale) + info->y));
 		SPR_2ScaleSpr(0, info->mirror, 0, 0xffff, info->char_num, xy, NO_GOUR); //4bpp scaled sprite
 	}
 	
 	else {
 		//offset of top left sprite corner from the origin
-		xOffset = -(MTH_Mul(info->xSize >> 1, info->scale));
-		yOffset = -(MTH_Mul(info->ySize >> 1, info->scale));
+		xOffset = -(MTH_Mul(info->x_size >> 1, info->scale));
+		yOffset = -(MTH_Mul(info->y_size >> 1, info->scale));
 		sin = MTH_Sin(info->angle);
 		cos = MTH_Cos(info->angle);
-		scaledX = info->xPos + MTH_Mul(info->xSize >> 1, info->scale);
-		scaledY = info->yPos + MTH_Mul(info->ySize >> 1, info->scale);
+		scaledX = info->x + MTH_Mul(info->x_size >> 1, info->scale);
+		scaledY = info->y + MTH_Mul(info->y_size >> 1, info->scale);
 		//formula from
 		//https://gamedev.stackexchange.com/questions/86755/
 		for (i = 0; i < 4; i++) {
@@ -100,10 +105,10 @@ void sprite_make(int tile_num, Fixed32 x, Fixed32 y, SPRITE_INFO *ptr) {
 	ptr->char_num = tile_num;
 	ptr->options = 0;
 	ptr->state = 0;
-	ptr->xPos = x;
-	ptr->yPos = y;
-	ptr->xSize = 0;
-	ptr->ySize = 0;
+	ptr->x = x;
+	ptr->y = y;
+	ptr->x_size = 0;
+	ptr->y_size = 0;
 	ptr->mirror = 0;
 	ptr->dx = 0;
 	ptr->dy = 0;
@@ -119,11 +124,11 @@ void sprite_draw_all() {
 	Sint32 rel_x, rel_y;
 	SPRITE_INFO tmp;
 	for (i = 0; i < SPRITE_LIST_SIZE; i++) {
-		rel_x = sprites[i].xPos - (scrolls_x[SCROLL_PLAYFIELD] & 0xffff0000);
-		rel_y = sprites[i].yPos - scrolls_y[SCROLL_PLAYFIELD];
+		rel_x = sprites[i].x - (scrolls_x[SCROLL_PLAYFIELD] & 0xffff0000);
+		rel_y = sprites[i].y - scrolls_y[SCROLL_PLAYFIELD];
 		//if sprite is more than 1/2 screen offscreen, don't render it
-		if (sprites[i].options & OPTION_NODISP || rel_x + sprites[i].xSize < MTH_FIXED(-160) || rel_x > MTH_FIXED(480) ||
-			 rel_y + sprites[i].ySize < MTH_FIXED(-112) || rel_y > MTH_FIXED(336)) {
+		if (sprites[i].options & OPTION_NODISP || rel_x + sprites[i].x_size < MTH_FIXED(-160) || rel_x > MTH_FIXED(480) ||
+			 rel_y + sprites[i].y_size < MTH_FIXED(-112) || rel_y > MTH_FIXED(336)) {
 			continue;
 		}
 
@@ -133,8 +138,8 @@ void sprite_draw_all() {
 		//check again because iterate function may have deleted sprite
 		if (!(sprites[i].options & OPTION_NODISP)) {
 			memcpy((void *)&tmp, (void *)&sprites[i], sizeof(SPRITE_INFO));
-			tmp.xPos = rel_x;
-			tmp.yPos = rel_y;
+			tmp.x = rel_x;
+			tmp.y = rel_y;
 			sprite_draw(&tmp);
 		}
 	}

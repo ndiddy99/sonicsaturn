@@ -25,10 +25,10 @@ typedef struct SpriteInfo {
 	Uint16 options;
 	Uint16 state;
 	Uint16 collision;
-	Fixed32 xPos;
-	Fixed32 yPos;
-	Fixed32 xSize;
-	Fixed32 ySize;
+	Fixed32 x;
+	Fixed32 y;
+	Fixed32 x_size;
+	Fixed32 y_size;
 	Fixed32 dx;
 	Fixed32 dy;
 	Fixed32 scale;

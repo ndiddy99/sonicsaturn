@@ -1,0 +1,9 @@
+Uint16 sonic_num = 1;
+Uint16 sonic_size = 640;
+Uint16 sonic_width = 32;
+Uint16 sonic_height = 40;
+char sonic_name[] = "SONIC.SPR";
+Uint32 sonic_pal[] = {
+	0xFF00FF,0x0008,0xA02020,0xC04020,0xE04040,0xE06060,0xE0E0E0,0xA0A0A0,
+	0x808080,0x404040,0x80A0E0,0x4060A0,0x00E0,0x0080,0x0040,0xE0E0,
+};

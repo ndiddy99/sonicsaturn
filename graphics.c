@@ -6,4 +6,5 @@ typedef unsigned long Uint32;
 // #include "graphic/cpz.c"
 //sprites
 #include "graphic/font.c"
+#include "graphic/sonic.c"
 

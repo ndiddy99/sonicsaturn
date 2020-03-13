@@ -9,6 +9,7 @@
 #include "cd.h"
 #include "graphicrefs.h"
 #include "scroll.h"
+#include "sonic.h"
 #include "sound.h"
 #include "sprite.h"
 #include "print.h"
@@ -26,6 +27,7 @@ int main() {
 	SCL_SetSpriteMode(SCL_TYPE5,SCL_MIX,SCL_SP_WINDOW);
 	sound_init();
 
+	sonic_init();
 
 	// sound_cdda(2);
 
@@ -41,27 +43,12 @@ int main() {
 			SYS_EXECDMP();
 		}
 
-		if (PadData1 & PAD_L) {
-			scroll_move(0, MTH_FIXED(-4), 0);
-			scroll_move(1, MTH_FIXED(-2), 0);
-		}
-
-		if (PadData1 & PAD_R) {
-			scroll_move(0, MTH_FIXED(4), 0);
-			scroll_move(1, MTH_FIXED(2), 0);
-		}
-		if (PadData1 & PAD_U) {
-			scroll_move(0, 0, MTH_FIXED(-4));
-			scroll_move(1, 0, MTH_FIXED(-2));
-		}
-		if (PadData1 & PAD_D) {
-			scroll_move(0, 0, MTH_FIXED(4));
-			scroll_move(1, 0, MTH_FIXED(2));
-		}
+		sonic_move();
 
 		SPR_2OpenCommand(SPR_2DRAW_PRTY_OFF);
 			// player_draw();
 			// sprite_draw_all();
+			sonic_display();
 			print_display();
 		SPR_2CloseCommand();
 

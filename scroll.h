@@ -39,7 +39,9 @@ void scroll_move(int num, Fixed32 x, Fixed32 y);
 void scroll_set(int num, Fixed32 x, Fixed32 y);
 //sets the scale of a bg
 void scroll_scale(int num, Fixed32 scale);
-//gets the value at the given coordinates for a square map
+//gets the block at the given coordinates
+//x: block x position (16x16)
+//y: block y position (16x16)
 Uint16 scroll_get(int num, int x, int y);
 //copies scroll to VRAM after position has been changed by move/set scroll
 void scroll_copy(int num);

@@ -186,12 +186,12 @@ void scroll_init() {
 	SCL_Close();
 	scroll_scale(0, FIXED(1));
 	scroll_scale(1, FIXED(1));
-	SCL_SetPriority(SCL_NBG0, 7); //set layer priorities
-	SCL_SetPriority(SCL_SPR,  6);
-	SCL_SetPriority(SCL_SP1,  6);
-	SCL_SetPriority(SCL_NBG1, 6);
-	SCL_SetPriority(SCL_NBG2, 5);
-	SCL_SetPriority(SCL_NBG3, 4);
+	SCL_SetPriority(SCL_SPR,  7); //set layer priorities
+	SCL_SetPriority(SCL_SP1,  7);
+	SCL_SetPriority(SCL_NBG0, 6);
+	SCL_SetPriority(SCL_NBG1, 5);
+	SCL_SetPriority(SCL_NBG2, 4);
+	SCL_SetPriority(SCL_NBG3, 3);
 	
 	// curr_level = level;
 
