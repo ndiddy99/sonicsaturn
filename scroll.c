@@ -69,6 +69,11 @@ SclLineparam line_param1;
 Uint32 block_defs[0x300 * 4];
 Uint16 chunk_defs[0x100 * 64];
 Uint8 level[0x1000];
+Uint8 slopes_normal[0x1000];
+Uint8 slopes_rotated[0x1000];
+Uint8 angles[0x100];
+Uint8 collision_indexes_pri[0x300];
+Uint8 collision_indexes_sec[0x300];
 
 void scroll_init() {
 	int i;
@@ -93,6 +98,10 @@ void scroll_init() {
 	cd_load_nosize("CPZ16.BIN", block_defs);
 	cd_load_nosize("CPZ128.BIN", chunk_defs);
 	cd_load_nosize("CPZ.LVL", level);
+	cd_load_nosize("SLOPESTD.BIN", slopes_normal);
+	cd_load_nosize("SLOPEROT.BIN", slopes_rotated);
+	cd_load_nosize("CPZINDP.BIN", collision_indexes_pri);
+	cd_load_nosize("CPZINDS.BIN", collision_indexes_sec);
 	// cd_load(level->bg_far.map_name, (void *)LWRAM, level->bg_far.map_width * level->bg_far.map_height * 2);
 	tilemap_ptr = VRAM_PTR(0);
 	for (i = 0; i < 64 * 64; i++) {
@@ -102,8 +111,6 @@ void scroll_init() {
 	for (i = 0; i < 64 * 64; i++) {
 		tilemap_ptr[i] = VRAM_A1_OFFSET;
 	}
-	print_num(block_defs[0xA * 4] | VRAM_A1_OFFSET, 5, 0);
-	print_num((1 << 16) | 0x1012, 6, 0);
 
 
 	//load initial level segment
@@ -336,7 +343,6 @@ Uint16 scroll_get(int num, int x, int y) {
 	if (num == 0) {
 		//foreground and background stored line-by-line
 		//and interleaved
-		//x >> 7 is same as x / 128 (each chunk is 128x128 pixels)
 		chunk = level[(y / 8) * 0x100 + (x / 8)];
 	}
 	else {
@@ -344,8 +350,38 @@ Uint16 scroll_get(int num, int x, int y) {
 		chunk = level[(y / 8) * 0x100 + 0x80 + (x / 8)];
 	}
 	//each chunk is 64 words, an 8x8 grid.
-	//((y & 0x7f) >> 4) = block position within chunk
 	return chunk_defs[(chunk * 64) + ((y % 8) * 8) + (x % 8)];
+}
+
+Uint8 scroll_height(int primary, Fixed32 x, Fixed32 y) {
+	//convert from 16.16 fixed-point pixels to 16x16 tiles
+	Uint16 block = scroll_get(0, x >> 20, y >> 20);
+	Uint8 slope_num;
+	if (primary) {
+		slope_num = collision_indexes_pri[block & 0x3ff];
+	}
+	else {
+		slope_num = collision_indexes_sec[block & 0x3ff];
+	}
+	                    //block start index  index within block
+	return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
+}
+
+Fixed32 scroll_angle(int primary, Fixed32 x, Fixed32 y) {
+	//convert from 16.16 fixed-point pixels to 16x16 tiles
+	Uint16 block = scroll_get(0, x >> 20, y >> 20);
+	Uint8 slope_num;
+	if (primary) {
+		slope_num = collision_indexes_pri[block & 0x3ff];
+	}
+	else {
+		slope_num = collision_indexes_sec[block & 0x3ff];
+	}
+	Uint8 angle = angles[slope_num];
+	//convert angle from its original format to a Fixed32 with degrees (0 to 360)		
+	Fixed32 degrees = MTH_Mul(MTH_IntToFixed(256 - angle), MTH_FIXED(1.40625));
+	//convert from 0 to 360 to -180 to 180 (what the SBL trig functions take)
+	return ((degrees + MTH_FIXED(180)) % 360) - MTH_FIXED(180);
 }
 
 void scroll_copy(int num) {

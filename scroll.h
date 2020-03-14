@@ -43,6 +43,14 @@ void scroll_scale(int num, Fixed32 scale);
 //x: block x position (16x16)
 //y: block y position (16x16)
 Uint16 scroll_get(int num, int x, int y);
+//gets the height of a given pixel
+//primary: 1 if primary collision, 0 if secondary
+//x, y: pixel to check
+Uint8 scroll_height(int primary, Fixed32 x, Fixed32 y);
+//gets the angle of a given pixel
+//primary: 1 if primary collision, 0 if secondary
+//x, y: pixel to check
+Fixed32 scroll_angle(int primary, Fixed32 x, Fixed32 y);
 //copies scroll to VRAM after position has been changed by move/set scroll
 void scroll_copy(int num);
 //sets up a linescroll screen with 4 splits.
