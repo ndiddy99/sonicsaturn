@@ -84,26 +84,53 @@ void sonic_move() {
     }
 
     if (PadData1 & PAD_U) {
-        sonic.dy = MTH_FIXED(-4);
+        sonic.dy = MTH_FIXED(-1);
     }
     else if (PadData1 & PAD_D) {
-        sonic.dy = MTH_FIXED(4);
+        sonic.dy = MTH_FIXED(1);
     }
     else {
         sonic.dy = 0;
     }
-    scroll_move(0, sonic.dx, sonic.dy);
-    scroll_move(1, sonic.dx >> 1, sonic.dy >> 1);
     sonic.x += sonic.dx;
     sonic.y += sonic.dy;
     sonic_collision();
+    scroll_set(0, sonic.x - MTH_FIXED(160), sonic.y - MTH_FIXED(100));
+}
+
+//returns the number of pixels to move up/down at a given location
+Sint8 sensor_check(Fixed32 target_x, Fixed32 target_y) {
+    Uint8 height = scroll_height(1, target_x, target_y);
+    Sint8 weighted_height = height;
+    //check above tile
+    if (height == 16) {
+        height = scroll_height(1, target_x, target_y - MTH_FIXED(16));
+        weighted_height = height + 16; //we have to add 16px to the height
+    }
+    //if tile is empty, get height from below block
+    else if (height == 0) {
+        height = scroll_height(1, target_x, target_y + MTH_FIXED(16));
+        weighted_height = height - 16; //we have to remove 16px from the height
+    }
+    return weighted_height;
 }
 
 void sonic_collision() {
-    Uint32 height_a = scroll_height(1, sonic.x - STANDING_XRADIUS, sonic.y + STANDING_YRADIUS);
-    Uint32 height_b = scroll_height(1, sonic.x + STANDING_XRADIUS, sonic.y + STANDING_YRADIUS);
+    Fixed32 foot_pos = sonic.y + STANDING_YRADIUS;
+    Sint8 height_a = sensor_check(sonic.x - STANDING_XRADIUS, foot_pos);
+    Sint8 height_b = sensor_check(sonic.x + STANDING_XRADIUS, foot_pos);
+    Sint8 height = height_a > height_b ? height_a : height_b;
+    //place sonic's feet at bottom of block
+    foot_pos &= 0xfff00000;
+    foot_pos += MTH_FIXED(16);
+    //move up by the highest sensor's height
+    foot_pos -= (height << 16);
+    sonic.y = foot_pos - STANDING_YRADIUS;
+
     print_num(height_a, 2, 0);
     print_num(height_b, 3, 0);
+    print_num(sonic.x >> 16, 4, 0);
+    print_num(sonic.y >> 16, 5, 0);
 }
 
 void sonic_display() {

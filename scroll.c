@@ -357,11 +357,19 @@ Uint8 scroll_height(int primary, Fixed32 x, Fixed32 y) {
 	//convert from 16.16 fixed-point pixels to 16x16 tiles
 	Uint16 block = scroll_get(0, x >> 20, y >> 20);
 	Uint8 slope_num;
+	//if block isn't solid, return 0
+	if ((block & 0xf000) == 0) {
+		return 0;
+	}
 	if (primary) {
 		slope_num = collision_indexes_pri[block & 0x3ff];
 	}
 	else {
 		slope_num = collision_indexes_sec[block & 0x3ff];
+	}
+	if (block & BLOCK_XFLIP) {
+		                    //block start index  index within block
+		return slopes_normal[(slope_num << 4) + (16 - ((x >> 16) & 0xf))];
 	}
 	                    //block start index  index within block
 	return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
