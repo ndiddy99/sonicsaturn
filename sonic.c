@@ -96,6 +96,7 @@ void sonic_move() {
     sonic.y += sonic.dy;
     sonic_collision();
     scroll_set(0, sonic.x - MTH_FIXED(160), sonic.y - MTH_FIXED(100));
+    scroll_set(1, scrolls_x[0] >> 1, scrolls_y[0] >> 1);
 }
 
 //returns the number of pixels to move up/down at a given location
@@ -103,9 +104,11 @@ Sint8 sensor_check(Fixed32 target_x, Fixed32 target_y) {
     Uint8 height = scroll_height(1, target_x, target_y);
     Sint8 weighted_height = height;
     //check above tile
-    if (height == 16) {
-        height = scroll_height(1, target_x, target_y - MTH_FIXED(16));
-        weighted_height = height + 16; //we have to add 16px to the height
+    if (height) {
+        Uint8 new_height = scroll_height(1, target_x, target_y - MTH_FIXED(16));
+        if (new_height != 0) {
+            weighted_height = new_height + 16; //we have to add 16px to the height
+        }
     }
     //if tile is empty, get height from below block
     else if (height == 0) {
@@ -121,7 +124,7 @@ void sonic_collision() {
     Sint8 height_b = sensor_check(sonic.x + STANDING_XRADIUS, foot_pos);
     Sint8 height = height_a > height_b ? height_a : height_b;
     //place sonic's feet at bottom of block
-    foot_pos &= 0xfff00000;
+    foot_pos &= 0xfff00000;    
     foot_pos += MTH_FIXED(16);
     //move up by the highest sensor's height
     foot_pos -= (height << 16);

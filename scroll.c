@@ -66,6 +66,13 @@ SclConfig scfg3;
 SclLineparam line_param0;
 SclLineparam line_param1;
 
+#define BLOCK_MIRROR_NONE (0)
+#define BLOCK_MIRROR_HORIZ (1)
+#define BLOCK_MIRROR_VERT (2)
+#define BLOCK_MIRROR_BOTH (3)
+#define TILE_XFLIP (1 << 30)
+#define TILE_YFLIP (1 << 31)
+
 Uint32 block_defs[0x300 * 4];
 Uint16 chunk_defs[0x100 * 64];
 Uint8 level[0x1000];
@@ -206,12 +213,6 @@ void scroll_init() {
 	SCL_SetColMixRate(SCL_SP1, 6);
 }
 
-#define BLOCK_MIRROR_NONE (0)
-#define BLOCK_MIRROR_HORIZ (1)
-#define BLOCK_MIRROR_VERT (2)
-#define BLOCK_MIRROR_BOTH (3)
-#define TILE_XFLIP (1 << 30)
-#define TILE_YFLIP (1 << 31)
 
 void scroll_load_block(int num, int block, int x, int y) {
 	Uint32 *tilemap_ptr = VRAM_PTR(num);
@@ -358,9 +359,9 @@ Uint8 scroll_height(int primary, Fixed32 x, Fixed32 y) {
 	Uint16 block = scroll_get(0, x >> 20, y >> 20);
 	Uint8 slope_num;
 	//if block isn't solid, return 0
-	if ((block & 0xf000) == 0) {
-		return 0;
-	}
+	// if ((block & 0x000) == 0) {
+		// return 0;
+	// }
 	if (primary) {
 		slope_num = collision_indexes_pri[block & 0x3ff];
 	}
@@ -369,7 +370,7 @@ Uint8 scroll_height(int primary, Fixed32 x, Fixed32 y) {
 	}
 	if (block & BLOCK_XFLIP) {
 		                    //block start index  index within block
-		return slopes_normal[(slope_num << 4) + (16 - ((x >> 16) & 0xf))];
+		return slopes_normal[(slope_num << 4) + (15 - ((x >> 16) & 0xf))];
 	}
 	                    //block start index  index within block
 	return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
