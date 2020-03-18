@@ -107,6 +107,7 @@ void scroll_init() {
 	cd_load_nosize("CPZ.LVL", level);
 	cd_load_nosize("SLOPESTD.BIN", slopes_normal);
 	cd_load_nosize("SLOPEROT.BIN", slopes_rotated);
+	cd_load_nosize("ANGLES.BIN", angles);
 	cd_load_nosize("CPZINDP.BIN", collision_indexes_pri);
 	cd_load_nosize("CPZINDS.BIN", collision_indexes_sec);
 	// cd_load(level->bg_far.map_name, (void *)LWRAM, level->bg_far.map_width * level->bg_far.map_height * 2);
@@ -387,10 +388,19 @@ Fixed32 scroll_angle(int primary, Fixed32 x, Fixed32 y) {
 		slope_num = collision_indexes_sec[block & 0x3ff];
 	}
 	Uint8 angle = angles[slope_num];
+	if (angle == 0xff) {
+		//workaround for flat slopes being denoted as 0xff
+		return 0;
+	}
 	//convert angle from its original format to a Fixed32 with degrees (0 to 360)		
 	Fixed32 degrees = MTH_Mul(MTH_IntToFixed(256 - angle), MTH_FIXED(1.40625));
 	//convert from 0 to 360 to -180 to 180 (what the SBL trig functions take)
-	return ((degrees + MTH_FIXED(180)) % 360) - MTH_FIXED(180);
+	Fixed32 degrees_range = ((degrees + MTH_FIXED(180)) % MTH_FIXED(360)) - MTH_FIXED(180);
+	//if block is facing the other way, invert the angle
+	if (block & BLOCK_XFLIP) {
+		return -degrees_range;
+	}
+	return degrees_range;
 }
 
 void scroll_copy(int num) {

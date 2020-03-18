@@ -5,6 +5,8 @@
 #include "print.h"
 #include "vblank.h"
 
+// #define ABS(x) (x > 0 ? x : -x)
+
 #define ACCEL (MTH_FIXED(0.046875))
 #define DECEL (MTH_FIXED(0.5))
 #define TOP_SPEED (MTH_FIXED(6))
@@ -15,7 +17,24 @@
 #define STANDING_XRADIUS (MTH_FIXED(9))
 #define STANDING_YRADIUS (MTH_FIXED(19))
 
+#define SLOPE_RUN (MTH_FIXED(0.125))
+#define SLOPE_ROLLUP (MTH_FIXED(0.078125))
+#define SLOPE_ROLLDOWN (MTH_FIXED (0.3125))
+
 SPRITE_INFO sonic;
+Fixed32 ground_speed;
+Fixed32 slope_factor;
+Fixed32 angle;
+
+#define MODE_GROUND (2)
+#define MODE_RWALL (3)
+#define MODE_CEIL (0)
+#define MODE_LWALL (1)
+int ground_mode;
+
+#define SENSOR_A (1)
+#define SENSOR_B (2)
+int last_ground_sensor = 0;
 
 
 void sonic_init() {
@@ -24,61 +43,76 @@ void sonic_init() {
 	sonic.y = MTH_FIXED(100);
     sonic.dx = 0;
     sonic.dy = 0;
+    sonic.x_size = MTH_FIXED(32);
+    sonic.y_size = MTH_FIXED(40);
 	sonic.angle = 0;
 	sonic.scale = MTH_FIXED(1);
+    ground_speed = 0;
 }
 
 void sonic_move() {
+    //set angle based on where sonic is touching the ground
+    if (last_ground_sensor == SENSOR_A) {
+        angle = scroll_angle(1, sonic.x - STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
+    }
+    else {
+        angle = scroll_angle(1, sonic.x + STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
+    }
+    print_num(angle >> 16, 1, 0);
+    
+    ground_speed -= MTH_Mul(SLOPE_RUN, MTH_Sin(angle));
+    ground_mode = (((angle >> 16) + 225) % 360) / 90;
+
     if (PadData1 & PAD_L) {
         //allow sonic to turn around quickly if he's already moving right
-        if (sonic.dx > 0) {
-            sonic.dx -= DECEL;
-            if (sonic.dx <= 0) {
-                sonic.dx = MTH_FIXED(-0.5);
+        if (ground_speed > 0) {
+            ground_speed -= DECEL;
+            if (ground_speed <= 0) {
+                ground_speed = MTH_FIXED(-0.5);
             }
         }
-        else if (sonic.dx > -TOP_SPEED) {
-            sonic.dx -= ACCEL;
+        else if (ground_speed > -TOP_SPEED) {
+            ground_speed -= ACCEL;
             //only check if we've exceeded the speed cap if we were previously
             //going slower than the speed cap
-            if (sonic.dx <= -TOP_SPEED) {
-                sonic.dx = -TOP_SPEED;
+            if (ground_speed <= -TOP_SPEED) {
+                ground_speed = -TOP_SPEED;
             }
         }
     }
     if (PadData1 & PAD_R) {
         //allow sonic to turn around quickly if he's already moving left
-        if (sonic.dx < 0) {
-            sonic.dx += DECEL;
-            if (sonic.dx >= 0) {
-                sonic.dx = MTH_FIXED(0.5);
+        if (ground_speed < 0) {
+            ground_speed += DECEL;
+            if (ground_speed >= 0) {
+                ground_speed = MTH_FIXED(0.5);
             }
         }
-        else if (sonic.dx < TOP_SPEED) {
-            sonic.dx += ACCEL;
+        else if (ground_speed < TOP_SPEED) {
+            ground_speed += ACCEL;
             //only check if we've exceeded the speed cap if we were previously
             //going slower than the speed cap            
-            if (sonic.dx >= TOP_SPEED) {
-                sonic.dx = TOP_SPEED;
+            if (ground_speed >= TOP_SPEED) {
+                ground_speed = TOP_SPEED;
             }
         }
     }
     //if we're not holding either direction, apply friction
     if ((PadData1 & (PAD_L | PAD_R)) == 0) {
-        if (sonic.dx < 0) {
+        if (ground_speed < 0) {
             //if we're going left, add speed until it's greater than zero, then
             //set the speed to zero
-            sonic.dx += ACCEL;
-            if (sonic.dx > 0) {
-                sonic.dx = 0;
+            ground_speed += ACCEL;
+            if (ground_speed > 0) {
+                ground_speed = 0;
             }
         }        
-        else if (sonic.dx > 0) {
+        else if (ground_speed > 0) {
             //if we're going right, subtract speed until it's less than zero, then
             //set the speed to zero
-            sonic.dx -= ACCEL;
-            if (sonic.dx < 0) {
-                sonic.dx = 0;
+            ground_speed -= ACCEL;
+            if (ground_speed < 0) {
+                ground_speed = 0;
             }
         }
     }
@@ -92,8 +126,19 @@ void sonic_move() {
     else {
         sonic.dy = 0;
     }
+
+    sonic.dx = MTH_Mul(ground_speed, MTH_Cos(angle));
+    sonic.dy = MTH_Mul(ground_speed, -MTH_Sin(angle));
     sonic.x += sonic.dx;
     sonic.y += sonic.dy;
+    //make it look like sonic's running on the slope
+    if (ABS(angle) > MTH_FIXED(33)) {
+        sonic.angle = -angle;
+    }
+    else {
+        sonic.angle = 0;
+    }
+
     sonic_collision();
     scroll_set(0, sonic.x - MTH_FIXED(160), sonic.y - MTH_FIXED(100));
     scroll_set(1, scrolls_x[0] >> 1, scrolls_y[0] >> 1);
@@ -122,7 +167,15 @@ void sonic_collision() {
     Fixed32 foot_pos = sonic.y + STANDING_YRADIUS;
     Sint8 height_a = sensor_check(sonic.x - STANDING_XRADIUS, foot_pos);
     Sint8 height_b = sensor_check(sonic.x + STANDING_XRADIUS, foot_pos);
-    Sint8 height = height_a > height_b ? height_a : height_b;
+    Sint8 height;
+    if (height_a > height_b) {
+        last_ground_sensor = SENSOR_A;
+        height = height_a;
+    }
+    else {
+        last_ground_sensor = SENSOR_B;
+        height = height_b;
+    }
     //place sonic's feet at bottom of block
     foot_pos &= 0xfff00000;    
     foot_pos += MTH_FIXED(16);
