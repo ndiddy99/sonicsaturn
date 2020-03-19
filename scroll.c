@@ -8,6 +8,7 @@
 #include "print.h"
 #include "scroll.h"
 #include "sprite.h"
+#include "sonic.h"
 #include "graphic/cpz.c"
 
 Fixed32 scrolls_x[]  = {0, 0, 0, 0};
@@ -87,7 +88,7 @@ void scroll_init() {
 	Uint16 BackCol;
 	Uint8 *VramWorkP;
 	Uint32 *tilemap_ptr;
-	Uint16 *lwram_ptr = (Uint16 *)LWRAM;
+	// Uint16 *lwram_ptr = (Uint16 *)LWRAM;
 	SclVramConfig vram_cfg;
 
 	SCL_SetColRamMode(SCL_CRM24_1024);
@@ -355,26 +356,64 @@ Uint16 scroll_get(int num, int x, int y) {
 	return chunk_defs[(chunk * 64) + ((y % 8) * 8) + (x % 8)];
 }
 
-Uint8 scroll_height(int primary, Fixed32 x, Fixed32 y) {
+Uint8 scroll_height(int primary, int mode, Fixed32 x, Fixed32 y) {
 	//convert from 16.16 fixed-point pixels to 16x16 tiles
 	Uint16 block = scroll_get(0, x >> 20, y >> 20);
 	Uint8 slope_num;
-	//if block isn't solid, return 0
-	// if ((block & 0x000) == 0) {
-		// return 0;
-	// }
+	Uint8 *slope_arr;
+	// if block isn't solid, return 0
+	if (primary && (block & 0x4000) == 0) {
+		return 0;
+	}
+	if (!primary && (block & 0x8000) == 0) {
+		return 0;
+	}
 	if (primary) {
 		slope_num = collision_indexes_pri[block & 0x3ff];
 	}
 	else {
 		slope_num = collision_indexes_sec[block & 0x3ff];
 	}
-	if (block & BLOCK_XFLIP) {
-		                    //block start index  index within block
-		return slopes_normal[(slope_num << 4) + (15 - ((x >> 16) & 0xf))];
+
+	switch (mode) {
+		case MODE_RWALL:
+			if (block & BLOCK_XFLIP) {
+								//block start index  index within block
+				return slopes_rotated[(slope_num << 4) + (15 - ((y >> 16) & 0xf))];
+			}
+								//block start index  index within block
+			return slopes_rotated[(slope_num << 4) + ((y >> 16) & 0xf)];
+			break;
+
+		case MODE_CEILING:
+			if (block & BLOCK_XFLIP) {
+								//block start index  index within block
+			return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
+			}
+								//block start index  index within block
+			return slopes_normal[(slope_num << 4) + (15 - ((x >> 16) & 0xf))];
+			break;
+
+		case MODE_LWALL:
+			if (block & BLOCK_XFLIP) {
+									//block start index  index within block
+				return slopes_rotated[(slope_num << 4) + ((y >> 16) & 0xf)];				
+			}
+								//block start index  index within block
+			return slopes_rotated[(slope_num << 4) + (15 - ((y >> 16) & 0xf))];			
+
+			break;						
+		//ground collision
+		default:
+			if (block & BLOCK_XFLIP) {
+								//block start index  index within block
+				return slopes_normal[(slope_num << 4) + (15 - ((x >> 16) & 0xf))];
+			}
+								//block start index  index within block
+			return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
+			break;
+
 	}
-	                    //block start index  index within block
-	return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
 }
 
 Fixed32 scroll_angle(int primary, Fixed32 x, Fixed32 y) {
@@ -397,7 +436,7 @@ Fixed32 scroll_angle(int primary, Fixed32 x, Fixed32 y) {
 	//convert from 0 to 360 to -180 to 180 (what the SBL trig functions take)
 	Fixed32 degrees_range = ((degrees + MTH_FIXED(180)) % MTH_FIXED(360)) - MTH_FIXED(180);
 	//if block is facing the other way, invert the angle
-	if (block & BLOCK_XFLIP) {
+	if (block & (BLOCK_XFLIP | BLOCK_YFLIP)) {
 		return -degrees_range;
 	}
 	return degrees_range;

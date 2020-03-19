@@ -26,15 +26,13 @@ Fixed32 ground_speed;
 Fixed32 slope_factor;
 Fixed32 angle;
 
-#define MODE_GROUND (2)
-#define MODE_RWALL (3)
-#define MODE_CEIL (0)
-#define MODE_LWALL (1)
 int ground_mode;
 
 #define SENSOR_A (1)
 #define SENSOR_B (2)
 int last_ground_sensor = 0;
+Fixed32 last_groundx = 0;
+Fixed32 last_groundy = 0;
 
 
 void sonic_init() {
@@ -52,16 +50,19 @@ void sonic_init() {
 
 void sonic_move() {
     //set angle based on where sonic is touching the ground
-    if (last_ground_sensor == SENSOR_A) {
-        angle = scroll_angle(1, sonic.x - STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
-    }
-    else {
-        angle = scroll_angle(1, sonic.x + STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
-    }
+    // if (last_ground_sensor == SENSOR_A) {
+    //     angle = scroll_angle(1, sonic.x - STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
+    // }
+    // else {
+    //     angle = scroll_angle(1, sonic.x + STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
+    // }
+
+    angle = scroll_angle(1, last_groundx, last_groundy);
     print_num(angle >> 16, 1, 0);
     
     ground_speed -= MTH_Mul(SLOPE_RUN, MTH_Sin(angle));
     ground_mode = (((angle >> 16) + 225) % 360) / 90;
+    print_num(ground_mode, 0, 0);
 
     if (PadData1 & PAD_L) {
         //allow sonic to turn around quickly if he's already moving right
@@ -132,7 +133,7 @@ void sonic_move() {
     sonic.x += sonic.dx;
     sonic.y += sonic.dy;
     //make it look like sonic's running on the slope
-    if (ABS(angle) > MTH_FIXED(33)) {
+    if (ABS(angle) > MTH_FIXED(27)) {
         sonic.angle = -angle;
     }
     else {
@@ -145,43 +146,168 @@ void sonic_move() {
 }
 
 //returns the number of pixels to move up/down at a given location
-Sint8 sensor_check(Fixed32 target_x, Fixed32 target_y) {
-    Uint8 height = scroll_height(1, target_x, target_y);
-    Sint8 weighted_height = height;
-    //check above tile
-    if (height) {
-        Uint8 new_height = scroll_height(1, target_x, target_y - MTH_FIXED(16));
-        if (new_height != 0) {
-            weighted_height = new_height + 16; //we have to add 16px to the height
-        }
-    }
-    //if tile is empty, get height from below block
-    else if (height == 0) {
-        height = scroll_height(1, target_x, target_y + MTH_FIXED(16));
-        weighted_height = height - 16; //we have to remove 16px from the height
+Sint8 sensor_check(int mode, Fixed32 target_x, Fixed32 target_y) {
+    Uint8 height;
+    Sint8 weighted_height = 0;
+    switch (mode) {
+        case MODE_GROUND:
+            height = scroll_height(1, MODE_GROUND, target_x, target_y);
+            weighted_height = height;
+            //check above tile
+            if (height == 16) {
+                Uint8 new_height = scroll_height(1, MODE_GROUND, target_x, target_y - MTH_FIXED(16));
+                if (new_height != 0) {
+                    weighted_height = new_height + 16; //we have to add 16px to the height
+                }
+            }
+            //if tile is empty, get height from below block
+            else if (height == 0) {
+                height = scroll_height(1, MODE_GROUND, target_x, target_y + MTH_FIXED(16));
+                weighted_height = height - 16; //we have to remove 16px from the height
+            }
+            break;
+
+        case MODE_RWALL:
+            height = scroll_height(1, MODE_RWALL, target_x, target_y);
+            weighted_height = height;
+            //check above tile
+            if (height == 16) {
+                Uint8 new_height = scroll_height(1, MODE_RWALL, target_x - MTH_FIXED(16), target_y);
+                if (new_height != 0) {
+                    weighted_height = new_height + 16; //we have to add 16px to the height
+                }
+            }
+            //if tile is empty, get height from below block
+            else if (height == 0) {
+                height = scroll_height(1, MODE_RWALL, target_x + MTH_FIXED(16), target_y);
+                weighted_height = height - 16; //we have to remove 16px from the height
+            }
+            break;
+
+        case MODE_CEILING:
+            height = scroll_height(1, MODE_CEILING, target_x, target_y);
+            weighted_height = height;
+            //check above tile
+            if (height == 16) {
+                Uint8 new_height = scroll_height(1, MODE_CEILING, target_x + MTH_FIXED(16), target_y);
+                if (new_height != 0) {
+                    weighted_height = new_height - 16; //we have to remove 16px from the height
+                }
+            }
+            //if tile is empty, get height from below block
+            else if (height == 0) {
+                height = scroll_height(1, MODE_CEILING, target_x - MTH_FIXED(16), target_y);
+                weighted_height = height + 16; //we have to add 16px to the height
+            }
+            break;
+        
+        case MODE_LWALL:
+            height = scroll_height(1, MODE_LWALL, target_x, target_y);
+            weighted_height = height;
+            //check above tile
+            if (height == 16) {
+                Uint8 new_height = scroll_height(1, MODE_LWALL, target_x + MTH_FIXED(16), target_y);
+                if (new_height != 0) {
+                    weighted_height = new_height - 16; //we have to remove 16px from the height
+                }
+            }
+            //if tile is empty, get height from below block
+            else if (height == 0) {
+                height = scroll_height(1, MODE_LWALL, target_x - MTH_FIXED(16), target_y);
+                weighted_height = height + 16; //we have to add 16px to the height
+            }
+            break; 
     }
     return weighted_height;
 }
 
 void sonic_collision() {
-    Fixed32 foot_pos = sonic.y + STANDING_YRADIUS;
-    Sint8 height_a = sensor_check(sonic.x - STANDING_XRADIUS, foot_pos);
-    Sint8 height_b = sensor_check(sonic.x + STANDING_XRADIUS, foot_pos);
+    Fixed32 foot_pos;
+    Sint8 height_a = 0;
+    Sint8 height_b = 0;
     Sint8 height;
-    if (height_a > height_b) {
-        last_ground_sensor = SENSOR_A;
-        height = height_a;
+
+    switch(ground_mode) {
+        case MODE_GROUND:
+            foot_pos = sonic.y + STANDING_YRADIUS;
+            height_a = sensor_check(MODE_GROUND, sonic.x - STANDING_XRADIUS, foot_pos);
+            height_b = sensor_check(MODE_GROUND, sonic.x + STANDING_XRADIUS, foot_pos);
+            if (height_a > height_b) {
+                last_groundx = sonic.x - STANDING_XRADIUS;
+                height = height_a;
+            }
+            else {
+                last_groundx = sonic.x + STANDING_XRADIUS;
+                height = height_b;
+            }
+            last_groundy = foot_pos;
+            //place sonic's feet at bottom of block
+            foot_pos &= 0xfff00000;    
+            foot_pos += MTH_FIXED(16);
+            //move up by the highest sensor's height
+            foot_pos -= (height << 16);
+            sonic.y = foot_pos - STANDING_YRADIUS;
+            break;
+
+        case MODE_RWALL:
+            foot_pos = sonic.x + STANDING_YRADIUS;
+            height_a = sensor_check(MODE_RWALL, foot_pos, sonic.y + STANDING_XRADIUS);
+            height_b = sensor_check(MODE_RWALL, foot_pos, sonic.y - STANDING_XRADIUS);
+            if (height_a > height_b) {
+                last_groundy = sonic.y + STANDING_XRADIUS;
+                height = height_a;
+            }
+            else {
+                last_groundy = sonic.y - STANDING_XRADIUS;
+                height = height_b;
+            }
+            last_groundx = foot_pos;
+            //place sonic's feet at bottom of block
+            foot_pos &= 0xfff00000;    
+            foot_pos += MTH_FIXED(16);
+            //move up by the highest sensor's height
+            foot_pos -= (height << 16);
+            sonic.x = foot_pos - STANDING_YRADIUS;
+            break;
+
+        case MODE_CEILING:
+            foot_pos = sonic.y - STANDING_YRADIUS;
+            height_a = sensor_check(MODE_CEILING, sonic.x + STANDING_XRADIUS, foot_pos);
+            height_b = sensor_check(MODE_CEILING, sonic.x - STANDING_XRADIUS, foot_pos);
+            if (height_a > height_b) {
+                last_groundx = sonic.x + STANDING_XRADIUS;
+                height = height_a;
+            }
+            else {
+                last_groundx = sonic.x - STANDING_XRADIUS;
+                height = height_b;
+            }
+            last_groundy = foot_pos + height;
+            foot_pos &= 0xfff00000;
+            foot_pos += (height << 16);
+            sonic.y = foot_pos + STANDING_YRADIUS;
+            break;
+
+        case MODE_LWALL:
+            foot_pos = sonic.x - STANDING_YRADIUS;
+            height_a = sensor_check(MODE_LWALL, foot_pos, sonic.y - STANDING_XRADIUS);
+            height_b = sensor_check(MODE_LWALL, foot_pos, sonic.y + STANDING_XRADIUS);
+            if (height_a > height_b) {
+                last_groundy = sonic.y - STANDING_XRADIUS;
+                height = height_a;
+            }
+            else {
+                last_groundy = sonic.y + STANDING_XRADIUS;
+                height = height_b;
+            }
+            last_groundx = foot_pos + height;
+            //place sonic's feet at bottom of block
+            foot_pos &= 0xfff00000;    
+            //move up by the highest sensor's height
+            foot_pos += (height << 16);
+            sonic.x = foot_pos + STANDING_YRADIUS;
+            break;
     }
-    else {
-        last_ground_sensor = SENSOR_B;
-        height = height_b;
-    }
-    //place sonic's feet at bottom of block
-    foot_pos &= 0xfff00000;    
-    foot_pos += MTH_FIXED(16);
-    //move up by the highest sensor's height
-    foot_pos -= (height << 16);
-    sonic.y = foot_pos - STANDING_YRADIUS;
 
     print_num(height_a, 2, 0);
     print_num(height_b, 3, 0);

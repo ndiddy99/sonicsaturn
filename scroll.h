@@ -45,8 +45,9 @@ void scroll_scale(int num, Fixed32 scale);
 Uint16 scroll_get(int num, int x, int y);
 //gets the height of a given pixel
 //primary: 1 if primary collision, 0 if secondary
+//mode: floor mode, see sonic.h
 //x, y: pixel to check
-Uint8 scroll_height(int primary, Fixed32 x, Fixed32 y);
+Uint8 scroll_height(int primary, int mode, Fixed32 x, Fixed32 y);
 //gets the angle of a given pixel
 //primary: 1 if primary collision, 0 if secondary
 //x, y: pixel to check
