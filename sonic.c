@@ -26,19 +26,20 @@ Fixed32 ground_speed;
 Fixed32 slope_factor;
 Fixed32 angle;
 
-int ground_mode;
+int ground_mode = MODE_GROUND;
 
 #define SENSOR_A (1)
 #define SENSOR_B (2)
 int last_ground_sensor = 0;
+//where sonic was last touching the ground
 Fixed32 last_groundx = 0;
 Fixed32 last_groundy = 0;
 
 
 void sonic_init() {
     sonic.char_num = 96;
-	sonic.x = MTH_FIXED(160);
-	sonic.y = MTH_FIXED(100);
+	sonic.x = MTH_FIXED(2637);
+	sonic.y = MTH_FIXED(621);
     sonic.dx = 0;
     sonic.dy = 0;
     sonic.x_size = MTH_FIXED(32);
@@ -49,15 +50,21 @@ void sonic_init() {
 }
 
 void sonic_move() {
-    //set angle based on where sonic is touching the ground
-    // if (last_ground_sensor == SENSOR_A) {
-    //     angle = scroll_angle(1, sonic.x - STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
-    // }
-    // else {
-    //     angle = scroll_angle(1, sonic.x + STANDING_XRADIUS, sonic.y + STANDING_YRADIUS + MTH_FIXED(1));
-    // }
-
+    //set angle based on where sonic last touched the ground
     angle = scroll_angle(1, last_groundx, last_groundy);
+    if (angle == 0) {
+        switch (ground_mode) {
+            case MODE_RWALL:
+                angle = MTH_FIXED(90);
+                break;
+            case MODE_CEILING:
+                angle = MTH_FIXED(180);
+                break;
+            case MODE_LWALL:
+                angle = MTH_FIXED(-90);
+                break;
+        }
+    }
     print_num(angle >> 16, 1, 0);
     
     ground_speed -= MTH_Mul(SLOPE_RUN, MTH_Sin(angle));
@@ -133,7 +140,7 @@ void sonic_move() {
     sonic.x += sonic.dx;
     sonic.y += sonic.dy;
     //make it look like sonic's running on the slope
-    if (ABS(angle) > MTH_FIXED(27)) {
+    if (ABS(angle) > MTH_FIXED(30)) {
         sonic.angle = -angle;
     }
     else {
@@ -142,7 +149,7 @@ void sonic_move() {
 
     sonic_collision();
     scroll_set(0, sonic.x - MTH_FIXED(160), sonic.y - MTH_FIXED(100));
-    scroll_set(1, scrolls_x[0] >> 1, scrolls_y[0] >> 1);
+    // scroll_set(1, scrolls_x[0] >> 1, scrolls_y[0] >> 1);
 }
 
 //returns the number of pixels to move up/down at a given location
@@ -189,15 +196,15 @@ Sint8 sensor_check(int mode, Fixed32 target_x, Fixed32 target_y) {
             weighted_height = height;
             //check above tile
             if (height == 16) {
-                Uint8 new_height = scroll_height(1, MODE_CEILING, target_x + MTH_FIXED(16), target_y);
+                Uint8 new_height = scroll_height(1, MODE_CEILING, target_x, target_y + MTH_FIXED(16));
                 if (new_height != 0) {
-                    weighted_height = new_height - 16; //we have to remove 16px from the height
+                    weighted_height = new_height + 16; //we have to add 16px to the height
                 }
             }
             //if tile is empty, get height from below block
             else if (height == 0) {
-                height = scroll_height(1, MODE_CEILING, target_x - MTH_FIXED(16), target_y);
-                weighted_height = height + 16; //we have to add 16px to the height
+                height = scroll_height(1, MODE_CEILING, target_x, target_y - MTH_FIXED(16));
+                weighted_height = height - 16; //we have to remove 16px from the height
             }
             break;
         
@@ -208,13 +215,13 @@ Sint8 sensor_check(int mode, Fixed32 target_x, Fixed32 target_y) {
             if (height == 16) {
                 Uint8 new_height = scroll_height(1, MODE_LWALL, target_x + MTH_FIXED(16), target_y);
                 if (new_height != 0) {
-                    weighted_height = new_height - 16; //we have to remove 16px from the height
+                    weighted_height = new_height + 16; //we have to add 16px to the height
                 }
             }
             //if tile is empty, get height from below block
             else if (height == 0) {
                 height = scroll_height(1, MODE_LWALL, target_x - MTH_FIXED(16), target_y);
-                weighted_height = height + 16; //we have to add 16px to the height
+                weighted_height = height - 16; //we have to remove 16px from the height
             }
             break; 
     }
@@ -313,6 +320,7 @@ void sonic_collision() {
     print_num(height_b, 3, 0);
     print_num(sonic.x >> 16, 4, 0);
     print_num(sonic.y >> 16, 5, 0);
+    print_num(scroll_get(0, last_groundx >> 20, last_groundy >> 20), 6, 0);
 }
 
 void sonic_display() {

@@ -360,7 +360,6 @@ Uint8 scroll_height(int primary, int mode, Fixed32 x, Fixed32 y) {
 	//convert from 16.16 fixed-point pixels to 16x16 tiles
 	Uint16 block = scroll_get(0, x >> 20, y >> 20);
 	Uint8 slope_num;
-	Uint8 *slope_arr;
 	// if block isn't solid, return 0
 	if (primary && (block & 0x4000) == 0) {
 		return 0;
@@ -376,8 +375,9 @@ Uint8 scroll_height(int primary, int mode, Fixed32 x, Fixed32 y) {
 	}
 
 	switch (mode) {
+		case MODE_LWALL:
 		case MODE_RWALL:
-			if (block & BLOCK_XFLIP) {
+			if (block & BLOCK_YFLIP) {
 								//block start index  index within block
 				return slopes_rotated[(slope_num << 4) + (15 - ((y >> 16) & 0xf))];
 			}
@@ -385,25 +385,26 @@ Uint8 scroll_height(int primary, int mode, Fixed32 x, Fixed32 y) {
 			return slopes_rotated[(slope_num << 4) + ((y >> 16) & 0xf)];
 			break;
 
-		case MODE_CEILING:
-			if (block & BLOCK_XFLIP) {
-								//block start index  index within block
-			return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
-			}
-								//block start index  index within block
-			return slopes_normal[(slope_num << 4) + (15 - ((x >> 16) & 0xf))];
-			break;
+		// case MODE_CEILING:
+		// 	if (block & BLOCK_XFLIP) {
+		// 						//block start index  index within block
+		// 	return slopes_normal[(slope_num << 4) + ((x >> 16) & 0xf)];
+		// 	}
+		// 						//block start index  index within block
+		// 	return slopes_normal[(slope_num << 4) + (15 - ((x >> 16) & 0xf))];
+		// 	break;
 
-		case MODE_LWALL:
-			if (block & BLOCK_XFLIP) {
-									//block start index  index within block
-				return slopes_rotated[(slope_num << 4) + ((y >> 16) & 0xf)];				
-			}
-								//block start index  index within block
-			return slopes_rotated[(slope_num << 4) + (15 - ((y >> 16) & 0xf))];			
+		// case MODE_LWALL:
+		// 	if (block & BLOCK_XFLIP) {
+		// 							//block start index  index within block
+		// 		return slopes_rotated[(slope_num << 4) + ((y >> 16) & 0xf)];				
+		// 	}
+		// 						//block start index  index within block
+		// 	return slopes_rotated[(slope_num << 4) + (15 - ((y >> 16) & 0xf))];			
 
-			break;						
+		// 	break;						
 		//ground collision
+		case MODE_CEILING:
 		default:
 			if (block & BLOCK_XFLIP) {
 								//block start index  index within block
@@ -433,10 +434,14 @@ Fixed32 scroll_angle(int primary, Fixed32 x, Fixed32 y) {
 	}
 	//convert angle from its original format to a Fixed32 with degrees (0 to 360)		
 	Fixed32 degrees = MTH_Mul(MTH_IntToFixed(256 - angle), MTH_FIXED(1.40625));
+	//if block is flipped, get the angle's compliment
+	if (block & BLOCK_YFLIP) {
+		degrees = MTH_FIXED(180) - degrees;
+	}
 	//convert from 0 to 360 to -180 to 180 (what the SBL trig functions take)
 	Fixed32 degrees_range = ((degrees + MTH_FIXED(180)) % MTH_FIXED(360)) - MTH_FIXED(180);
 	//if block is facing the other way, invert the angle
-	if (block & (BLOCK_XFLIP | BLOCK_YFLIP)) {
+	if (block & BLOCK_XFLIP) {
 		return -degrees_range;
 	}
 	return degrees_range;
